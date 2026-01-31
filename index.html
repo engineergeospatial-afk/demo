@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Kenya Spatial Land Portal</title>
+    
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<div id="sidebar">
+    <h2>LAND PORTAL</h2>
+    
+    <div class="control-group">
+        <label>SEARCH BY PLOT ID</label>
+        <input type="text" id="searchBox" placeholder="e.g. 123/45..." onkeyup="filterParcels()">
+    </div>
+
+    <button id="bufferBtn" class="btn btn-buffer" onclick="toggleBufferMode()">PROXIMITY ANALYZER (2KM)</button>
+    <p id="hint"></p>
+
+    <div id="analysisResults">
+        <p style="color:#666; font-style:italic;">Click "Proximity Analyzer" then click any point on the map to see nearby amenities.</p>
+    </div>
+    
+    <div class="legend">
+        <h4>MAP LEGEND</h4>
+        <div class="legend-item">
+            <div class="legend-color" style="background-color: #2ecc71;"></div>
+            <span class="legend-label">Available Plot</span>
+        </div>
+        <div class="legend-item">
+            <div class="legend-color" style="background-color: #e74c3c;"></div>
+            <span class="legend-label">Sold Plot</span>
+        </div>
+        <div class="legend-item">
+            <div class="legend-color" style="background-color: #3498db; opacity: 0.5;"></div>
+            <span class="legend-label">2km Analysis Radius</span>
+        </div>
+    </div>
+</div>
+
+<div id="map"></div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+<script>
+    // 1. Initialize Map centered on Nairobi
+    const map = L.map('map').setView([-1.286, 36.817], 13); 
+
+    // 2. Basemaps
+    const osm = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '© OSM' });
+    const googleSat = L.tileLayer('http://{s}.google.com/vt/lyrs=s&x={x}&y={y}&z={z}', {
+        maxZoom: 20, subdomains:['mt0','mt1','mt2','mt3'], attribution: '© Google'
+    }).addTo(map);
+
+    // 3. Custom Icons for Amenities
+    const icons = {
+        school: L.icon({ iconUrl: 'https://cdn-icons-png.flaticon.com/512/167/167707.png', iconSize: [20, 20] }),
+        health: L.icon({ iconUrl: 'https://cdn-icons-png.flaticon.com/512/684/684102.png', iconSize: [20, 20] }),
+        town: L.icon({ iconUrl: 'https://cdn-icons-png.flaticon.com/512/1218/1218350.png', iconSize: [20, 20] })
+    };
+
+    // 4. Layers Initialization
+    let parcelData; 
+    const parcelLayer = L.geoJSON(null, {
+        style: (f) => ({
+            fillColor: f.properties.status === 'AVAILABLE' ? '#2ecc71' : '#e74c3c',
+            weight: 1.5, color: 'white', fillOpacity: 0.6
+        }),
+        onEachFeature: (f, l) => {
+            const center = l.getBounds().getCenter();
+            const googleUrl = `https://www.google.com/maps/dir/?api=1&destination=${center.lat},${center.lng}`;
+            
+            const popupContent = `
+                <div class="map-popup">
+                    <h4 style="color: ${f.properties.status === 'AVAILABLE' ? '#2ecc71' : '#e74c3c'}">
+                        📍 Plot ID: ${f.properties.id}
+                    </h4>
+                    <hr>
+                    <p><b>Status:</b> ${f.properties.status}</p>
+                    <p><b>Area:</b> ${f.properties.area || 'N/A'} Ha</p>
+                    <p><b>County:</b> ${f.properties.county || 'Kenya'}</p>
+                    <a href="${googleUrl}" target="_blank" class="nav-link">Navigate to Plot</a>
+                </div>
+            `;
+            l.bindPopup(popupContent);
+        }
+    }).addTo(map);
+
+    const schoolLayer = L.layerGroup().addTo(map);
+    const healthLayer = L.layerGroup().addTo(map);
+
+    // 5. Layer Control
+    L.control.layers({ "Satellite": googleSat, "Street": osm }, {
+        "🏠 Land Parcels": parcelLayer,
+        "🏫 Schools": schoolLayer,
+        "🏥 Health Centers": healthLayer
+    }).addTo(map);
+
+    // 6. Data Fetching Logic (Replace URLs with your actual GeoJSON endpoints)
+    async function fetchData() {
+        try {
+            const pRes = await fetch('/api/parcels');
+            parcelData = await pRes.json();
+            parcelLayer.addData(parcelData);
+            map.fitBounds(parcelLayer.getBounds());
+        } catch (e) { console.error("Error loading GeoJSON", e); }
+    }
+
+    fetchData();
+
+    // 7. Search/Filter Logic
+    function filterParcels() {
+        const val = document.getElementById('searchBox').value.toLowerCase();
+        parcelLayer.clearLayers();
+        const filtered = {
+            ...parcelData,
+            features: parcelData.features.filter(f => 
+                f.properties.id.toString().toLowerCase().includes(val)
+            )
+        };
+        parcelLayer.addData(filtered);
+    }
+
+    // 8. Proximity Buffer Tool
+    let bufferActive = false;
+    let tempCircle = null;
+
+    function toggleBufferMode() {
+        bufferActive = !bufferActive;
+        const btn = document.getElementById('bufferBtn');
+        if(bufferActive) {
+            btn.classList.add('btn-active');
+            btn.innerText = "CANCEL ANALYSIS";
+        } else {
+            btn.classList.remove('btn-active');
+            btn.innerText = "PROXIMITY ANALYZER (2KM)";
+            if(tempCircle) map.removeLayer(tempCircle);
+        }
+    }
+
+    map.on('click', async (e) => {
+        if (!bufferActive) return;
+        if (tempCircle) map.removeLayer(tempCircle);
+        
+        tempCircle = L.circle(e.latlng, { radius: 2000, color: '#3498db', fillOpacity: 0.2 }).addTo(map);
+        
+        // Example fetch for proximity results
+        const res = await fetch(`/api/proximity?lat=${e.latlng.lat}&lng=${e.latlng.lng}`);
+        const data = await res.json();
+        
+        let html = `<h4>Results (2km Radius)</h4>`;
+        data.forEach(item => {
+            html += `<div class="result-card"><strong>${item.name}</strong><small>${item.distance}m away</small></div>`;
+        });
+        document.getElementById('analysisResults').innerHTML = html;
+    });
+</script>
+
+</body>
+</html>

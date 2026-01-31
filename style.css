@@ -1,0 +1,77 @@
+/* ... Keep your existing global reset and sidebar styles ... */
+
+#hint {
+    font-size: 0.75rem;
+    color: #888;
+    text-align: center;
+    margin-top: 8px;
+}
+
+/* LEGEND STYLING */
+.legend {
+    margin-top: auto; /* Pushes legend to the bottom of sidebar */
+    padding: 15px;
+    background: #2d303e;
+    border-radius: 8px;
+}
+
+.legend h4 {
+    font-size: 0.8rem;
+    color: #27ae60;
+    margin-bottom: 10px;
+    text-transform: uppercase;
+}
+
+.legend-item {
+    display: flex;
+    align-items: center;
+    margin-bottom: 8px;
+    font-size: 0.85rem;
+}
+
+.legend-color {
+    width: 18px;
+    height: 18px;
+    margin-right: 10px;
+    border-radius: 3px;
+}
+
+/* POPUP STYLING */
+.map-popup {
+    color: #333;
+    padding: 5px;
+}
+
+.map-popup h4 {
+    margin: 0 0 8px 0;
+    font-size: 1rem;
+}
+
+.nav-link {
+    display: block;
+    margin-top: 10px;
+    padding: 8px;
+    background: #4285F4;
+    color: white !important;
+    text-align: center;
+    text-decoration: none;
+    border-radius: 4px;
+    font-weight: bold;
+    font-size: 0.8rem;
+}
+
+.nav-link:hover {
+    background: #357ae8;
+}
+
+/* ANIMATION FOR BUFFER BUTTON */
+.btn-active {
+    background: #e74c3c !important;
+    animation: pulse-red 2s infinite;
+}
+
+@keyframes pulse-red {
+    0% { box-shadow: 0 0 0 0 rgba(231, 76, 60, 0.7); }
+    70% { box-shadow: 0 0 0 10px rgba(231, 76, 60, 0); }
+    100% { box-shadow: 0 0 0 0 rgba(231, 76, 60, 0); }
+}
